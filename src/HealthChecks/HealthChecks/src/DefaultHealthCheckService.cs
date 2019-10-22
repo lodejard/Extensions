@@ -168,75 +168,48 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks
             }
         }
 
-        internal static class EventIds
-        {
-            public static readonly EventId HealthCheckProcessingBegin = (100, nameof(HealthCheckProcessingBegin));
-            public static readonly EventId HealthCheckProcessingEnd = (101, nameof(HealthCheckProcessingEnd));
-
-            public static readonly EventId HealthCheckBegin = (102, nameof(HealthCheckBegin));
-            public static readonly EventId HealthCheckEnd = (103, nameof(HealthCheckEnd));
-            public static readonly EventId HealthCheckError = (104, nameof(HealthCheckError));
-            public static readonly EventId HealthCheckData = (105, nameof(HealthCheckData));
-        }
-
         private static class Log
         {
-            private static readonly Action<ILogger, Exception> _healthCheckProcessingBegin = LoggerMessage.Define(
-                LogLevel.Debug,
-                EventIds.HealthCheckProcessingBegin,
-                "Running health checks");
+            private static readonly DebugMessage _healthCheckProcessingBegin =
+                (100, nameof(HealthCheckProcessingBegin), "Running health checks");
 
-            private static readonly Action<ILogger, double, HealthStatus, Exception> _healthCheckProcessingEnd = LoggerMessage.Define<double, HealthStatus>(
-                LogLevel.Debug,
-                EventIds.HealthCheckProcessingEnd,
-                "Health check processing completed after {ElapsedMilliseconds}ms with combined status {HealthStatus}");
+            private static readonly DebugMessage<double, HealthStatus> _healthCheckProcessingEnd =
+                (101, nameof(HealthCheckProcessingEnd), "Health check processing completed after {ElapsedMilliseconds}ms with combined status {HealthStatus}");
 
-            private static readonly Action<ILogger, string, Exception> _healthCheckBegin = LoggerMessage.Define<string>(
-                LogLevel.Debug,
-                EventIds.HealthCheckBegin,
-                "Running health check {HealthCheckName}");
+            private static readonly DebugMessage<string> _healthCheckBegin = 
+                (102, nameof(HealthCheckBegin), "Running health check {HealthCheckName}");
 
             // These are separate so they can have different log levels
             private static readonly string HealthCheckEndText = "Health check {HealthCheckName} completed after {ElapsedMilliseconds}ms with status {HealthStatus} and '{HealthCheckDescription}'";
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndHealthy = LoggerMessage.Define<string, double, HealthStatus, string>(
-                LogLevel.Debug,
-                EventIds.HealthCheckEnd,
-                HealthCheckEndText);
+            private static readonly LogLevelMessage<string, double, HealthStatus, string> _healthCheckEndHealthy =
+                (LogLevel.Information, 103, nameof(HealthCheckEnd), HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndDegraded = LoggerMessage.Define<string, double, HealthStatus, string>(
-                LogLevel.Warning,
-                EventIds.HealthCheckEnd,
-                HealthCheckEndText);
+            private static readonly LogLevelMessage<string, double, HealthStatus, string> _healthCheckEndDegraded =
+                (LogLevel.Warning, 103, nameof(HealthCheckEnd), HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndUnhealthy = LoggerMessage.Define<string, double, HealthStatus, string>(
-                LogLevel.Error,
-                EventIds.HealthCheckEnd,
-                HealthCheckEndText);
+            private static readonly LogLevelMessage<string, double, HealthStatus, string> _healthCheckEndUnhealthy =
+                (LogLevel.Error, 103, nameof(HealthCheckEnd), HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndFailed = LoggerMessage.Define<string, double, HealthStatus, string>(
-                LogLevel.Error,
-                EventIds.HealthCheckEnd,
-                HealthCheckEndText);
+            private static readonly ErrorMessage<string, double> _healthCheckError =
+                (104, nameof(HealthCheckError), "Health check {HealthCheckName} threw an unhandled exception after {ElapsedMilliseconds}ms");
 
-            private static readonly Action<ILogger, string, double, Exception> _healthCheckError = LoggerMessage.Define<string, double>(
-                LogLevel.Error,
-                EventIds.HealthCheckError,
-                "Health check {HealthCheckName} threw an unhandled exception after {ElapsedMilliseconds}ms");
+            private static readonly EventId _healthCheckData =
+                (105, nameof(HealthCheckData));
 
             public static void HealthCheckProcessingBegin(ILogger logger)
             {
-                _healthCheckProcessingBegin(logger, null);
+                _healthCheckProcessingBegin.Log(logger);
             }
 
             public static void HealthCheckProcessingEnd(ILogger logger, HealthStatus status, TimeSpan duration)
             {
-                _healthCheckProcessingEnd(logger, duration.TotalMilliseconds, status, null);
+                _healthCheckProcessingEnd.Log(logger, duration.TotalMilliseconds, status);
             }
 
             public static void HealthCheckBegin(ILogger logger, HealthCheckRegistration registration)
             {
-                _healthCheckBegin(logger, registration.Name, null);
+                _healthCheckBegin.Log(logger, registration.Name);
             }
 
             public static void HealthCheckEnd(ILogger logger, HealthCheckRegistration registration, HealthReportEntry entry, TimeSpan duration)
@@ -244,22 +217,22 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks
                 switch (entry.Status)
                 {
                     case HealthStatus.Healthy:
-                        _healthCheckEndHealthy(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description, null);
+                        _healthCheckEndHealthy.Log(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description);
                         break;
 
                     case HealthStatus.Degraded:
-                        _healthCheckEndDegraded(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description, null);
+                        _healthCheckEndDegraded.Log(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description);
                         break;
 
                     case HealthStatus.Unhealthy:
-                        _healthCheckEndUnhealthy(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description, null);
+                        _healthCheckEndUnhealthy.Log(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description);
                         break;
                 }
             }
 
             public static void HealthCheckError(ILogger logger, HealthCheckRegistration registration, Exception exception, TimeSpan duration)
             {
-                _healthCheckError(logger, registration.Name, duration.TotalMilliseconds, exception);
+                _healthCheckError.Log(logger, exception, registration.Name, duration.TotalMilliseconds);
             }
 
             public static void HealthCheckData(ILogger logger, HealthCheckRegistration registration, HealthReportEntry entry)
@@ -268,7 +241,7 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks
                 {
                     logger.Log(
                         LogLevel.Debug,
-                        EventIds.HealthCheckData,
+                        _healthCheckData,
                         new HealthCheckDataLogValue(registration.Name, entry.Data),
                         null,
                         (state, ex) => state.ToString());

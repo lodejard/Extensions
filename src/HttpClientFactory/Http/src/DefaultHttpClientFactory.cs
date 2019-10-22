@@ -332,53 +332,37 @@ namespace Microsoft.Extensions.Http
 
         private static class Log
         {
-            public static class EventIds
-            {
-                public static readonly EventId CleanupCycleStart = (100, nameof(CleanupCycleStart));
-                public static readonly EventId CleanupCycleEnd = (101, nameof(CleanupCycleEnd));
-                public static readonly EventId CleanupItemFailed = (102, nameof(CleanupItemFailed));
-                public static readonly EventId HandlerExpired = (103, nameof(HandlerExpired));
-            }
+            private static readonly DebugMessage<int> _cleanupCycleStart =
+                (100, nameof(CleanupCycleStart), "Starting HttpMessageHandler cleanup cycle with {InitialCount} items");
 
-            private static readonly Action<ILogger, int, Exception> _cleanupCycleStart = LoggerMessage.Define<int>(
-                LogLevel.Debug,
-                EventIds.CleanupCycleStart,
-                "Starting HttpMessageHandler cleanup cycle with {InitialCount} items");
+            private static readonly DebugMessage<double, int, int> _cleanupCycleEnd = 
+                (101, nameof(CleanupCycleEnd), "Ending HttpMessageHandler cleanup cycle after {ElapsedMilliseconds}ms - processed: {DisposedCount} items - remaining: {RemainingItems} items");
 
-            private static readonly Action<ILogger, double, int, int, Exception> _cleanupCycleEnd = LoggerMessage.Define<double, int, int>(
-                LogLevel.Debug,
-                EventIds.CleanupCycleEnd,
-                "Ending HttpMessageHandler cleanup cycle after {ElapsedMilliseconds}ms - processed: {DisposedCount} items - remaining: {RemainingItems} items");
+            private static readonly ErrorMessage<string> _cleanupItemFailed =
+                (102, nameof(CleanupItemFailed), "HttpMessageHandler.Dispose() threw and unhandled exception for client: '{ClientName}'");
 
-            private static readonly Action<ILogger, string, Exception> _cleanupItemFailed = LoggerMessage.Define<string>(
-                LogLevel.Error,
-                EventIds.CleanupItemFailed,
-                "HttpMessageHandler.Dispose() threw and unhandled exception for client: '{ClientName}'");
-
-            private static readonly Action<ILogger, double, string, Exception> _handlerExpired = LoggerMessage.Define<double, string>(
-                LogLevel.Debug,
-                EventIds.HandlerExpired,
-                "HttpMessageHandler expired after {HandlerLifetime}ms for client '{ClientName}'");
+            private static readonly DebugMessage<double, string> _handlerExpired =
+                (103, nameof(HandlerExpired), "HttpMessageHandler expired after {HandlerLifetime}ms for client '{ClientName}'");
 
 
             public static void CleanupCycleStart(ILogger logger, int initialCount)
             {
-                _cleanupCycleStart(logger, initialCount, null);
+                _cleanupCycleStart.Log(logger, initialCount);
             }
 
             public static void CleanupCycleEnd(ILogger logger, TimeSpan duration, int disposedCount, int finalCount)
             {
-                _cleanupCycleEnd(logger, duration.TotalMilliseconds, disposedCount, finalCount, null);
+                _cleanupCycleEnd.Log(logger, duration.TotalMilliseconds, disposedCount, finalCount);
             }
 
             public static void CleanupItemFailed(ILogger logger, string clientName, Exception exception)
             {
-                _cleanupItemFailed(logger, clientName, exception);
+                _cleanupItemFailed.Log(logger, exception, clientName);
             }
 
             public static void HandlerExpired(ILogger logger, string clientName, TimeSpan lifetime)
             {
-                _handlerExpired(logger, lifetime.TotalMilliseconds, clientName, null);
+                _handlerExpired.Log(logger, lifetime.TotalMilliseconds, clientName);
             }
         }
     }

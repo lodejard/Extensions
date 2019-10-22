@@ -39,10 +39,7 @@ namespace SampleApp
 
                 logger.LogInformation("Starting");
 
-                var startTime = DateTimeOffset.Now;
-                logger.LogInformation(1, "Started at '{StartTime}' and 0x{Hello:X} is hex of 42", startTime, 42);
-                // or
-                logger.ProgramStarting(startTime, 42);
+                logger.ProgramStarting(DateTimeOffset.Now, 42);
 
                 using (logger.PurchaseOrderScope("00655321"))
                 {
@@ -69,16 +66,14 @@ namespace SampleApp
                             input = Console.ReadLine();
 
                             logger.LogInformation("User typed '{input}' on the command line", input);
+
                             logger.LogWarning("The time is now {Time}, it's getting late!", DateTimeOffset.Now);
                         }
                         while (input != "quit");
                     }
                 }
 
-                var endTime = DateTimeOffset.Now;
-                logger.LogInformation(2, "Stopping at '{StopTime}'", endTime);
-                // or
-                logger.ProgramStopping(endTime);
+                logger.ProgramStopping(DateTimeOffset.Now);
 
                 logger.LogInformation("Stopping");
             }

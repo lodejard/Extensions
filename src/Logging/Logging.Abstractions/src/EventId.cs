@@ -77,6 +77,21 @@ namespace Microsoft.Extensions.Logging
             return Name ?? Id.ToString();
         }
 
+        public static EventId FromName(string name)
+        {
+            unchecked
+            {
+                var hash = 3074457345618258791ul;
+                for (var index = 0; index < name.Length; ++index)
+                {
+                    hash += name[index];
+                    hash *= 3074457345618258799ul;
+                }
+
+                return new EventId(100000 + (int)(hash % 900000), name);
+            }
+        }
+
         /// <summary>
         /// Indicates whether the current object is equal to another object of the same type. Two events are equal if they have the same id.
         /// </summary>

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -8,31 +8,42 @@ namespace SampleApp
 {
     internal static class LoggerExtensions
     {
-        private static Func<ILogger, string, IDisposable> _purchaseOrderScope;
-        private static Action<ILogger, DateTimeOffset, int, Exception> _programStarting;
-        private static Action<ILogger, DateTimeOffset, Exception> _programStopping;
+        private static readonly ScopeMessage<string> _purchaseOrderScope = "PO:{PurchaseOrder}";
 
-        static LoggerExtensions()
+        private static readonly InformationMessage<DateTimeOffset, int> _programStarting = (nameof(ProgramStarting), "Starting at '{StartTime}' and 0x{Hello:X} is hex of 42");
+
+        private static readonly InformationMessage<DateTimeOffset> _programStopping = (nameof(ProgramStopping), "Stopping at '{StopTime}'");
+
+        /// <summary>
+        /// Logs the scope "PO:{PurchaseOrder}"
+        /// </summary>
+        /// <param name="logger">The logger to write to</param>
+        /// <param name="purchaseOrder">The {PurchaseOrder} message property</param>
+        /// <returns></returns>
+        public static IDisposable PurchaseOrderScope(this ILogger<Program> logger, string purchaseOrder)
         {
-            _purchaseOrderScope = LoggerMessage.DefineScope<string>("PO:{PurchaseOrder}");
-            _programStarting = LoggerMessage.Define<DateTimeOffset, int>(LogLevel.Information, 1, "Starting at '{StartTime}' and 0x{Hello:X} is hex of 42");
-            _programStopping = LoggerMessage.Define<DateTimeOffset>(LogLevel.Information, 2, "Stopping at '{StopTime}'");
+            return _purchaseOrderScope.Begin(logger, purchaseOrder);
         }
 
-        public static IDisposable PurchaseOrderScope(this ILogger logger, string purchaseOrder)
+        /// <summary>
+        /// Logs an informational message "Starting at '{StartTime}' and 0x{Hello:X} is hex of 42"
+        /// </summary>
+        /// <param name="logger">The logger to write to</param>
+        /// <param name="startTime">The {StartTime} message property</param>
+        /// <param name="hello">The {Hello} message property</param>
+        public static void ProgramStarting(this ILogger<Program> logger, DateTimeOffset startTime, int hello)
         {
-            return _purchaseOrderScope(logger, purchaseOrder);
+            _programStarting.Log(logger, startTime, hello);
         }
 
-        public static void ProgramStarting(this ILogger logger, DateTimeOffset startTime, int hello, Exception exception = null)
+        /// <summary>
+        /// Logs an informational message "Stopping at '{StopTime}'"
+        /// </summary>
+        /// <param name="logger">The logger to write to</param>
+        /// <param name="stopTime">The {StopTime} message property</param>
+        public static void ProgramStopping(this ILogger<Program> logger, DateTimeOffset stopTime)
         {
-            _programStarting(logger, startTime, hello, exception);
-        }
-
-        public static void ProgramStopping(this ILogger logger, DateTimeOffset stopTime, Exception exception = null)
-        {
-            _programStopping(logger, stopTime, exception);
+            _programStopping.Log(logger, stopTime);
         }
     }
 }
-

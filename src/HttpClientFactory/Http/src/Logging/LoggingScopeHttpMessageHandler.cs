@@ -35,72 +35,77 @@ namespace Microsoft.Extensions.Http.Logging
 
             var stopwatch = ValueStopwatch.StartNew();
 
-            using (Log.BeginRequestPipelineScope(_logger, request))
+            using (Log.RequestPipelineScope(_logger, request))
             {
+                var traceEnabled = _logger.IsEnabled(LogLevel.Trace);
+
                 Log.RequestPipelineStart(_logger, request);
+                if (traceEnabled)
+                {
+                    Log.RequestPipelineRequestHeader(_logger, request);
+                }
+
                 var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
                 Log.RequestPipelineEnd(_logger, response, stopwatch.GetElapsedTime());
+                if (traceEnabled)
+                {
+                    Log.RequestPipelineResponseHeader(_logger, response);
+                }
 
                 return response;
             }
         }
-        
+
         private static class Log
         {
-            public static class EventIds
+            private static readonly ScopeMessage<HttpMethod, Uri> _requestPipelineScope = "HTTP {HttpMethod} {Uri}";
+
+            private static readonly InformationMessage<HttpMethod, Uri> _requestPipelineStart =
+                (100, nameof(RequestPipelineStart), "Start processing HTTP request {HttpMethod} {Uri}");
+
+            private static readonly InformationMessage<double, HttpStatusCode> _requestPipelineEnd =
+                (101, nameof(RequestPipelineEnd), "End processing HTTP request after {ElapsedMilliseconds}ms - {StatusCode}");
+
+            private static readonly EventId _requestPipelineRequestHeader =
+                (102, nameof(RequestPipelineRequestHeader));
+
+            private static readonly EventId _requestPipelineResponseHeader =
+                (103, nameof(RequestPipelineResponseHeader));
+
+            public static IDisposable RequestPipelineScope(ILogger logger, HttpRequestMessage request)
             {
-                public static readonly EventId RequestPipelineStart = (100, nameof(RequestPipelineStart));
-                public static readonly EventId RequestPipelineEnd = (101, nameof(RequestPipelineEnd));
-
-                public static readonly EventId RequestPipelineRequestHeader = (102, nameof(RequestPipelineRequestHeader));
-                public static readonly EventId RequestPipelineResponseHeader = (103, nameof(RequestPipelineResponseHeader));
-            }
-
-            private static readonly Func<ILogger, HttpMethod, Uri, IDisposable> _beginRequestPipelineScope = LoggerMessage.DefineScope<HttpMethod, Uri>("HTTP {HttpMethod} {Uri}");
-
-            private static readonly Action<ILogger, HttpMethod, Uri, Exception> _requestPipelineStart = LoggerMessage.Define<HttpMethod, Uri>(
-                LogLevel.Information, 
-                EventIds.RequestPipelineStart, 
-                "Start processing HTTP request {HttpMethod} {Uri}");
-
-            private static readonly Action<ILogger, double, HttpStatusCode, Exception> _requestPipelineEnd = LoggerMessage.Define<double, HttpStatusCode>(
-                LogLevel.Information,
-                EventIds.RequestPipelineEnd,
-                "End processing HTTP request after {ElapsedMilliseconds}ms - {StatusCode}");
-
-            public static IDisposable BeginRequestPipelineScope(ILogger logger, HttpRequestMessage request)
-            {
-                return _beginRequestPipelineScope(logger, request.Method, request.RequestUri);
+                return _requestPipelineScope.Begin(logger, request.Method, request.RequestUri);
             }
 
             public static void RequestPipelineStart(ILogger logger, HttpRequestMessage request)
             {
-                _requestPipelineStart(logger, request.Method, request.RequestUri, null);
-
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.Log(
-                        LogLevel.Trace,
-                        EventIds.RequestPipelineRequestHeader,
-                        new HttpHeadersLogValue(HttpHeadersLogValue.Kind.Request, request.Headers, request.Content?.Headers),
-                        null,
-                        (state, ex) => state.ToString());
-                }
+                _requestPipelineStart.Log(logger, request.Method, request.RequestUri);
             }
 
             public static void RequestPipelineEnd(ILogger logger, HttpResponseMessage response, TimeSpan duration)
             {
-                _requestPipelineEnd(logger, duration.TotalMilliseconds, response.StatusCode, null);
+                _requestPipelineEnd.Log(logger, duration.TotalMilliseconds, response.StatusCode);
+            }
 
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.Log(
-                        LogLevel.Trace,
-                        EventIds.RequestPipelineResponseHeader,
-                        new HttpHeadersLogValue(HttpHeadersLogValue.Kind.Response, response.Headers, response.Content?.Headers),
-                        null,
-                        (state, ex) => state.ToString());
-                }
+            public static void RequestPipelineRequestHeader(ILogger logger, HttpRequestMessage request)
+            {
+                logger.Log(
+                    LogLevel.Trace,
+                    _requestPipelineRequestHeader,
+                    new HttpHeadersLogValue(HttpHeadersLogValue.Kind.Request, request.Headers, request.Content?.Headers),
+                    null,
+                    (state, ex) => state.ToString());
+            }
+
+            public static void RequestPipelineResponseHeader(ILogger logger, HttpResponseMessage response)
+            {
+                logger.Log(
+                    LogLevel.Trace,
+                    _requestPipelineResponseHeader,
+                    new HttpHeadersLogValue(HttpHeadersLogValue.Kind.Response, response.Headers, response.Content?.Headers),
+                    null,
+                    (state, ex) => state.ToString());
             }
         }
     }
